@@ -10,9 +10,16 @@ openclaw skills install git:Vanaheim-Labs/docgent-skills
 
 This installs `docgent-doc-access` into the active workspace's `skills/` directory.
 
+**Ask a human for a brand token when you install this** — the skill will not work with
+zero brands configured, and `SKILL.md`'s "Install" section walks through asking for the
+token, verifying it actually works (one cheap API call), then saving it. Don't skip the
+verification step; a silently-wrong token surfaces as a confusing 401 later, not now when
+it's easy to fix.
+
 ## Configure
 
-Add a per-brand agent token to `~/.openclaw/openclaw.json`:
+The install flow (see `SKILL.md`) writes this for you, but for reference — a per-brand
+agent token lives in `~/.openclaw/openclaw.json`:
 
 ```json5
 {
@@ -21,7 +28,7 @@ Add a per-brand agent token to `~/.openclaw/openclaw.json`:
       "docgent-doc-access": {
         enabled: true,
         brands: {
-          inkl: { token: "<agent token for the inkl brand>" }
+          inkl: { token: "***" }
         }
       }
     }
@@ -29,9 +36,13 @@ Add a per-brand agent token to `~/.openclaw/openclaw.json`:
 }
 ```
 
-See `SKILL.md` for the full behaviour, API contract, and current known gap
-(server-side bearer-token auth is not yet live on docs.docgent.io — see the
-skill file's "What this skill needs, and why it may not work yet" section).
+## What this skill can do
+
+Read, create, edit (via propose→accept or direct write), render to PDF, diff between
+versions, manage approval status, and restore old versions of Docgent documents — see
+`SKILL.md` for the full endpoint-by-endpoint API contract, worked examples, an HTTP status
+code reference table, and known API gaps (no remote document listing, no doctype listing,
+no brand creation — all still manual as of 2026-08-15).
 
 ## Update
 

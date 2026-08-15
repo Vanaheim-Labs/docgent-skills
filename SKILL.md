@@ -23,13 +23,25 @@ token(s) right then — do not silently skip credential setup and do not write a
 1. Run the install command above.
 2. Ask: *"Which brand(s) do you want this instance to access, and what's the agent token for
    each?"* (One token per brand — see "Config" below for where they come from.)
-3. Once given a token, write it to `skills.entries.docgent-doc-access.brands.<brand>.token`
-   in `openclaw.json` yourself (via the `gateway` config tool) — don't ask the human to hand-edit
+3. **Verify each token before saving it, don't save-and-hope.** Call
+   `GET https://docs.docgent.io/api/status/<brand>/__token-check__` with the token as a bearer
+   header. A `404` means the token is valid and that brand is reachable (the slug just doesn't
+   exist, which is expected — that's fine, it proves auth passed). A `401` means the token is
+   wrong, expired, or for the wrong brand — say so plainly and ask for a corrected token rather
+   than saving a token you know is bad.
+4. Once verified, write it to `skills.entries.docgent-doc-access.brands.<brand>.token` in
+   `openclaw.json` yourself (via the `gateway` config tool) — don't ask the human to hand-edit
    JSON.
-4. Confirm back which brand(s) are now configured before considering the install done.
+5. Confirm back which brand(s) are now configured **and verified working** before considering
+   the install done. Do not report success for a brand whose token you saved but never checked.
 
-Do not proceed with install "successfully" if no token was provided — a skill installed
-with zero brands configured cannot do anything, and should be reported as such, not as done.
+Do not proceed with install "successfully" if no token was provided, or if the only token given
+failed verification — a skill installed with zero *working* brands cannot do anything, and that
+should be reported as a blocker, not glossed over as done.
+
+**Example install report, once verified:**
+> Installed `docgent-doc-access`. Verified and configured: `inkl` ✅. Ready to use —
+> paste a `docs.docgent.io/inkl/...` URL any time.
 
 ## Config (where tokens live and where they come from)
 
@@ -66,6 +78,21 @@ every call. Brand and slug are lowercase path segments, e.g. `inkl`, `vanaheim`,
 (Docgent's ~25-term vocabulary — callouts, key figures, recommendations, etc. — not arbitrary
 HTML). `sha` is the blob SHA; keep it, you need it to write back safely (see below).
 A 404 means that slug doesn't exist under that brand yet.
+
+**Worked example:**
+```
+GET /api/doc/inkl/q3-strategy-memo
+Authorization: Bearer <token>
+
+200 OK
+{
+  "brand": "inkl",
+  "slug": "q3-strategy-memo",
+  "content": "---\ntitle: \"Q3 Strategy\"\nstatus: draft\n---\n\n# Context\n...",
+  "sha": "a1b2c3d...",
+  "frontmatter": { "title": "Q3 Strategy", "status": "draft", "doctype": "Strategy Memo" }
+}
+```
 
 ### Create a new document
 Same endpoint, different call: `PUT /api/doc/<brand>/<slug>` with
@@ -142,6 +169,17 @@ version, changed, sha, commit }`.
 - No endpoint to create a brand itself — brands are provisioned manually (brand.yaml + repo +
   token), not something this skill can do.
 
+## HTTP status codes, what each one actually means here
+
+| Code | Meaning in this API | What to do |
+|---|---|---|
+| 200 | Success (read, render, preview, diff) | Use the response |
+| 401 | No/invalid session and no valid bearer token for this brand | Check the token is set and correct for *this* brand — don't retry with a different brand's token |
+| 404 | Slug doesn't exist under that brand | For a read: report it doesn't exist yet. For a status check during token verification: this is actually a *success* signal (auth passed, the probe slug just isn't real) |
+| 409 | Concurrent write conflict, or invalid status transition, or restoring a no-op | Refetch current state and reconcile — never blindly retry the same write |
+| 422 | Content failed vocabulary validation | Read `diagnostics` in the response and fix the specific block(s) named, don't retry unchanged |
+| 502 | Render/preview pipeline failed | Not a content problem — report as an infrastructure issue, don't retry rewriting the document to work around it |
+
 ## Pitfalls
 
 - Don't paste a document's raw `content` into a Slack reply as if it were plain text you
@@ -157,6 +195,9 @@ version, changed, sha, commit }`.
 - For an "improve/rewrite this" style request against an *existing* document, use
   propose→accept, not a raw PUT — a raw PUT with no diff step is what Docgent's product brief
   explicitly calls out as the wrong model ("AI rewrites are proposals, never direct commits").
+- Don't skip the token-verification step at install (see "Install" above) — a silently-wrong
+  token surfaces as a confusing 401 on the first real document request days later, not at
+  install time when it's easy to fix.
 
 ## Verify
 
