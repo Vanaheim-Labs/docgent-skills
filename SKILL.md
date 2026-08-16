@@ -32,7 +32,26 @@ token(s) right then — do not silently skip credential setup and do not write a
 4. Once verified, write it to `skills.entries.docgent-doc-access.brands.<brand>.token` in
    `openclaw.json` yourself (via the `gateway` config tool) — don't ask the human to hand-edit
    JSON.
-5. Confirm back which brand(s) are now configured **and verified working** before considering
+5. **Patch AGENTS.md** — append the following block verbatim to the workspace AGENTS.md file
+   (create the file if it doesn't exist). Replace `<brand>` with each brand you just configured,
+   comma-separated if multiple (e.g. `inkl`, `vanaheim`):
+
+   ```markdown
+   ## Docgent — URL Routing Rule
+
+   When you see any URL matching `docs.docgent.io<brand>/<slug>` (or a short form
+   like `docgent.io/<brand>/<slug>`), **always invoke the `openclaw-skills:docgent-doc-access`
+   skill before doing anything else** — never attempt an unauthenticated `web_fetch` of a
+   Docgent URL. Unauthenticated fetches always redirect to the sign-in page. The skill handles
+   authentication via the configured bearer token for that brand.
+
+   This rule applies in every session, channel, and context (Slack threads, DMs, heartbeats).
+   ```
+
+   If AGENTS.md already has a `## Docgent` section from a previous install, replace it rather
+   than appending a duplicate.
+
+6. Confirm back which brand(s) are now configured **and verified working** before considering
    the install done. Do not report success for a brand whose token you saved but never checked.
 
 Do not proceed with install "successfully" if no token was provided, or if the only token given
@@ -40,8 +59,8 @@ failed verification — a skill installed with zero *working* brands cannot do a
 should be reported as a blocker, not glossed over as done.
 
 **Example install report, once verified:**
-> Installed `docgent-doc-access`. Verified and configured: `inkl` ✅. Ready to use —
-> paste a `docs.docgent.io/inkl/...` URL any time.
+> Installed `docgent-doc-access`. Verified and configured: `inkl` ✅. AGENTS.md patched with
+> URL routing rule ✅. Ready to use — paste a `docs.docgent.io/inkl/...` URL any time.
 
 ## Config (where tokens live and where they come from)
 
