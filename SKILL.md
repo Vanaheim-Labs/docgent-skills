@@ -205,12 +205,83 @@ the old content forward as a *new* commit (never rewrites history), bumping the 
 past every version this document has ever carried. Response: `{ restoredFrom, restoredVersion,
 version, changed, sha, commit }`.
 
+### Read brand config (brand.yaml)
+`GET /api/brand/<brand>/config`
+→ `{ brand, yaml, sha }`. `yaml` is the raw brand.yaml source text. `sha` is the blob SHA
+you **must** send back on PUT to detect concurrent edits. Keep it.
+
+**Worked example:**
+```
+GET /api/brand/increm/config
+Authorization: Bearer <token>
+
+200 OK
+{
+  "brand": "increm",
+  "yaml": "id: increm\nname: Increm\n...",
+  "sha": "a1b2c3d..."
+}
+```
+
+### Update brand config (brand.yaml)
+`PUT /api/brand/<brand>/config`
+Body: `{ yaml: string, baseSha: string, message?: string }`
+
+- `yaml` — the full brand.yaml text you want committed (raw text, not a diff or partial patch)
+- `baseSha` — **mandatory** — the sha from your prior GET. A write without baseSha is rejected
+  (400). A write where baseSha doesn't match HEAD is rejected (409 StaleWriteError).
+- `message` — optional commit message (default: `feat(<brand>): update brand config via agent`)
+
+The write is committed to the `docgent-brands` git repo with the agent's identity, so the
+branch history is a reliable audit trail of every config change.
+
+Response: `{ changed: boolean, sha: <new blob sha>, commit: { sha, url } | null }`
+
+**Workflow — always read before writing:**
+1. `GET /api/brand/<brand>/config` → get current `yaml` and `sha`
+2. Apply your changes to the `yaml` text (edit inline, preserve all comments and formatting)
+3. `PUT /api/brand/<brand>/config` with `{ yaml: <edited text>, baseSha: <sha from step 1> }`
+4. Confirm `changed: true` and a new `sha` in the response
+
+**Never PUT a guessed or stale baseSha.** Always read first, then write. A 409 means something
+changed since you read it — re-read and reconcile before retrying.
+
+### Upload a brand asset (logo, CSS, etc.)
+`PUT /api/brand/<brand>/assets/<filename>`
+
+Filename must contain only letters, digits, dots, hyphens, underscores (no path traversal).
+File is stored at `<brand>/assets/<filename>` in `docgent-brands`.
+
+**Option A — JSON body (recommended for programmatic use):**
+```json
+{ "content": "<utf-8 text or base64 bytes>", "encoding": "utf-8" | "base64", "message": "optional commit msg" }
+```
+- Text assets (SVG, CSS): `encoding: "utf-8"`, content is plain text
+- Binary assets (PNG, WOFF): `encoding: "base64"`, content is base64-encoded bytes
+
+**Option B — Raw binary body:**
+Send the file bytes directly with any Content-Type other than `application/json`. Studio
+automatically base64-encodes it before committing. Simplest for piping a PNG directly.
+
+Response: `{ changed: boolean, sha, commit, path }` where `path` is `<brand>/assets/<filename>`.
+
+Assets are always overwritten (last writer wins) — no baseSha required. After uploading a
+logo, update `brand.yaml` to reference it (e.g. add a `logo:` key), then PUT the config.
+
+**Typical logo upload + wire-up flow:**
+1. `PUT /api/brand/increm/assets/logo.svg` with the SVG content
+2. `GET /api/brand/increm/config` to get current yaml + sha
+3. Edit yaml to add/update `logo: assets/logo.svg`
+4. `PUT /api/brand/increm/config` with edited yaml and baseSha
+
 ### What has no API (known gaps, be honest about them, don't invent a workaround)
 - No endpoint to list a brand's available doctypes/templates remotely — the `doctype` values
   in `GET /api/docs/<brand>` are a good proxy (they're whatever existing documents actually
   use), but there's no template/schema listing yet.
 - No endpoint to create a brand itself — brands are provisioned manually (brand.yaml + repo +
   token), not something this skill can do.
+- No endpoint to list assets currently in a brand's assets/ directory — check the docgent-brands
+  repo directly if you need to know what's already there.
 
 ## HTTP status codes, what each one actually means here
 
