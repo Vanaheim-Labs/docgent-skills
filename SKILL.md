@@ -283,6 +283,73 @@ logo, update `brand.yaml` to reference it (e.g. add a `logo:` key), then PUT the
 - No endpoint to list assets currently in a brand's assets/ directory — check the docgent-brands
   repo directly if you need to know what's already there.
 
+## Vocabulary reference
+
+Docgent documents use a closed vocabulary — raw HTML is never allowed. These are the terms
+agents most commonly need when creating or editing documents. Full list in `vocabulary.yaml`
+in the renderer repo.
+
+**`::icon-grid`** *(added 2026-08-26)* — compact tiled grid of SVG icons. Use for
+platform/integration grids. Each H3 heading becomes a tile; its body is inline SVG.
+Do **not** use `::chart` for icon grids — `::chart` renders one SVG full-page.
+
+```
+::icon-grid{cols=4}
+
+### Xero
+<svg .../>
+
+### HubSpot
+<svg .../>
+
+::
+```
+
+Attrs: `cols` 2–6 (default 4), `label` (group label above grid), `caption` (footer).
+Each H3 also accepts `sub="platform names"` for a subtitle line under the tile name.
+
+**`::chart`** — single full-width SVG hero. Use for actual data charts only.
+
+**`::product-cards`** — multi-column card grid (columns set by brand config). Each H3 starts
+a card; bullet items become em-dash rows.
+
+**`::kpi-row`** — horizontal strip of 3–6 stat cards. List items with `value:` and `label:`.
+
+**`::key-figure`** — single dominant stat. Body contains `value:`, `label:`, `source:` lines.
+
+**`::callout`** — boxed aside. Attrs: `type=insight|warning|risk|success`, `label`.
+
+**`::datatable`** — pipe table wrapper. Attrs: `dense=true`, `caption`.
+
+**`::financialtable`** — financial table. Row prefix `section:`, `sub:`, `tot:` controls styling.
+
+**`::risk`** — risk callout. Attrs: `severity=low|medium|high|critical`.
+
+**`::timeline`** — vertical timeline. Each H3: `"DD Mon YYYY — Event Title"`.
+
+**`::allocation`** — proportional bar chart. Each list item: `"Label — NN%"`.
+
+**`::funnel`** — horizontal stage diagram.
+
+**`::milestones`** — two-column box grid.
+
+**`::recommendation`** — numbered recommendation. Attrs: `ref`, `owner`, `priority`.
+
+**`::pullquote`** — large quotation. Attrs: `attribution`, `size=normal|large`.
+
+**`::columns`** — multi-column flow. Attrs: `count` (default 2).
+
+**`::comparison-grid`** — side-by-side plan comparison. H3 with `.highlight` = recommended.
+
+**`::team-grid`** — person cards. H3 = name, `role=` attr = role.
+
+**`::tensionbox`** — inverted dark callout for the single most important narrative. Use once per doc.
+
+**`::pagebreak`** — explicit page break. Use sparingly.
+
+**Inline:** `[text]{.accent}` accent colour in headings · `[text]{.redact}` redacted ·
+`^[footnote text]` inline footnote.
+
 ## HTTP status codes, what each one actually means here
 
 | Code | Meaning in this API | What to do |
