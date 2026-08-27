@@ -289,6 +289,26 @@ Docgent documents use a closed vocabulary — raw HTML is never allowed. These a
 agents most commonly need when creating or editing documents. Full list in `vocabulary.yaml`
 in the renderer repo.
 
+**H1 eyebrow override** *(documented 2026-08-27)* — to make the section eyebrow label
+independent from the H1 heading text, add an `eyebrow` attribute directly to the H1:
+
+```markdown
+# A new law. A hard deadline. {eyebrow="Introduction"}
+```
+
+The eyebrow renders as `01 · INTRODUCTION`; the H1 text stays "A new law. A hard deadline."
+This works on any H1 heading. Eyebrow label precedence (highest to lowest):
+1. `{eyebrow="..."}` — overrides the eyebrow only
+2. `{nav-title="..."}` — overrides eyebrow + TOC/running header label
+3. H1 text itself (default)
+
+To suppress the eyebrow entirely on one heading: `# Heading {.no-eyebrow}`
+
+No block primitive needed — these are inline heading attributes handled by the vocabulary
+Lua filter. No CSS changes required.
+
+---
+
 **`::icon-grid`** *(added 2026-08-26)* — compact tiled grid of SVG icons. Use for
 platform/integration grids. Each H3 heading becomes a tile; its body is inline SVG.
 Do **not** use `::chart` for icon grids — `::chart` renders one SVG full-page.
