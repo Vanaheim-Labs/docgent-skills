@@ -159,9 +159,9 @@ again and reconcile before retrying, don't just resend with a stale sha.
 
 Response for both create and update: `{ changed: boolean, sha: <new sha>, commit }`.
 
-### Propose an edit, don't just PUT — the actual expected workflow
-For an *edit to an existing document*, use the propose/accept pair over a raw PUT so the
-change goes through the same diff-then-commit path:
+### Edit directly or propose and accept a rewrite
+Authorised agents can edit at any lifecycle status. Use direct PUT when you already have
+the intended content, or the propose/accept pair for a server-generated rewrite:
 
 1. `POST /api/rewrite/<brand>/<slug>` with `{ instruction, scope }` where `scope` is one of
    `{ kind: "document" }`, `{ kind: "section", heading: "<exact or near-exact heading text>" }`,
@@ -174,10 +174,11 @@ change goes through the same diff-then-commit path:
    This call re-checks `baseSha` atomically, so a concurrent edit between propose and accept
    fails safely with 409.
 
-A direct `PUT /api/doc/<brand>/<slug>` is fine for creating a brand-new document (nothing to
-diff against yet) or for a mechanical edit the human has fully specified verbatim. For
-"improve this" / "rewrite the intro" style requests against an existing document, use
-propose/accept.
+Both direct PUT and rewrite acceptance preserve vocabulary validation, exact-version
+conflict protection, Git history and author attribution. Neither requires an additional
+human-acceptance step for a user-authorised edit. Inspect the intended change before writing
+and read back the committed document afterwards. A 409 requires reconciliation, not a blind
+retry with a newer SHA.
 
 ### Diff between two versions
 `GET /api/diff/<brand>/<slug>?base=<sha>&head=<sha-or-omit-for-HEAD>` →
@@ -194,11 +195,18 @@ content use the preview endpoints instead.
 /api/preview/<brand>/<slug>/html` with the same body → HTML with layout anchors.
 
 ### Read / change approval status
-`GET /api/status/<brand>/<slug>` → `{ status, allowed }` (allowed = valid next statuses from
-here). `POST /api/status/<brand>/<slug>` with `{ to, note, baseSha }` moves it — the lifecycle
-is linear: `draft → review → approved → released → superseded`, plus one demotion back a step
-at review/approved. A 409 means the requested transition isn't valid from the current status;
-report the `allowed` list rather than retrying blindly.
+`GET /api/status/<brand>/<slug>` → `{ status, allowed }`. `allowed` contains suggested
+transitions only, not a permission boundary. An authorised agent may use
+`POST /api/status/<brand>/<slug>` with `{ to, note, baseSha }` to select any valid status:
+`draft`, `review`, `approved`, `released` or `superseded`. Supply the exact current blob SHA.
+Unknown statuses return 400; missing/malformed `baseSha` returns 428; stale versions return
+409 and require a fresh read and reconciliation. Status can also be set in validated
+frontmatter through PUT; new documents do not have to start as drafts.
+
+Review is optional and never an edit/restore lock. A retained status label after an edit
+does not prove that the current content was reviewed or approved. Git attribution and
+version-specific review records describe the actor and version involved, not blanket human
+approval of later edits.
 
 ### Restore an old version
 `POST /api/restore/<brand>/<slug>` with `{ ref: <sha to restore>, baseSha, note }` — writes
@@ -378,7 +386,8 @@ a card; bullet items become em-dash rows.
 | 200 | Success (read, render, preview, diff) | Use the response |
 | 401 | No/invalid session and no valid bearer token for this brand | Check the token is set and correct for *this* brand — don't retry with a different brand's token |
 | 404 | Slug doesn't exist under that brand | For a read: report it doesn't exist yet. For a status check during token verification: this is a *success* signal (auth passed, the probe slug just isn't real) |
-| 409 | Concurrent write conflict, or invalid status transition, or restoring a no-op | Refetch current state and reconcile — never blindly retry the same write |
+| 409 | Concurrent write conflict, or restoring a no-op | Refetch current state and reconcile — never blindly retry the same write |
+| 428 | Missing or malformed required baseSha | Read the current document and send its exact blob SHA |
 | 422 | Content failed vocabulary validation | Read `diagnostics` in the response and fix the specific block(s) named, don't retry unchanged |
 | 502 | Render/preview pipeline failed | Not a content problem — report as an infrastructure issue, don't retry rewriting the document to work around it |
 
@@ -396,10 +405,9 @@ a card; bullet items become em-dash rows.
   deprecated 2026-08-15.
 - Sending a guessed/stale `baseSha` instead of one you actually read from a GET response is
   the most common way to trigger an avoidable 409 — always read-then-write, never write blind.
-- For an "improve/rewrite this" style request against an *existing* document, use
-  propose→accept, not a raw PUT — a raw PUT bypasses the `baseSha` atomicity check and skips
-  the diff trail. Authorised agents may call the accept endpoint directly without human
-  confirmation; the human-acceptance gate was removed in PRs #35/#36.
+- Direct PUT and propose→accept both retain exact `baseSha` checks and Git history.
+  Choose the path that fits the requested edit; authorised agents can accept their rewrite
+  proposals directly without a separate human confirmation step.
 - Don't skip the token-verification step at install — a silently-wrong token surfaces as a
   confusing 401 on the first real document request, not at install time when it's easy to fix.
 - **Do not infer that a brand is configured just because this skill is installed.** Always
