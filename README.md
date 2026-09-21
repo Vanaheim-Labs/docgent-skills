@@ -39,10 +39,12 @@ agent token lives in `~/.openclaw/openclaw.json`:
 ## What this skill can do
 
 Read, create, edit (via propose→accept or direct write), render to PDF, diff between
-versions, manage approval status, and restore old versions of Docgent documents — see
-`SKILL.md` for the full endpoint-by-endpoint API contract, worked examples, an HTTP status
-code reference table, and known API gaps (no remote document listing, no doctype listing,
-no brand creation — all still manual as of 2026-08-15).
+versions, accept rewrites directly, change document status, and restore old versions of
+Docgent documents — authorised agents can perform all of these without human acceptance
+(API gates removed in PRs #35/#36). See `SKILL.md` for the full endpoint-by-endpoint API
+contract, worked examples, an HTTP status code reference table, and known API gaps (no
+remote document listing, no doctype listing, no brand creation — all still manual as of
+2026-08-15).
 
 ## Update
 
