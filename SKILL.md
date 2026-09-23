@@ -1,13 +1,13 @@
 ---
 name: "docgent-doc-access"
-description: "Read, create, edit, render, and manage approval status of Docgent documents from a docs.docgent.io/<brand>/<slug> URL, using a per-brand agent token."
+description: "Read, create, edit, render, export to PDF or DOCX, and manage approval status of Docgent documents from a docs.docgent.io/<brand>/<slug> URL, using a per-brand agent token."
 ---
 
 # Docgent Document Access
 
 Use when a Docgent URL is pasted into a conversation (`https://docs.docgent.io/<brand>/<slug>`,
-optionally with `?ref=<sha>`), or when asked to read, create, edit, render, diff, or change the
-approval status of a Docgent document. Not for browsing Docgent generally, and not for documents
+optionally with `?ref=<sha>`), or when asked to read, create, edit, render, export (PDF or DOCX),
+diff, or change the approval status of a Docgent document. Not for browsing Docgent generally, and not for documents
 from any other system.
 
 ## Install (this skill, on a new OpenClaw instance)
@@ -189,6 +189,39 @@ figure value 4.2M → 4.8M"); `unified` is a normal line-based diff with context
 `GET /api/render/<brand>/<slug>` (optional `?ref=<sha>` for a historical version) → raw PDF
 bytes, `Content-Type: application/pdf`. Renders committed content only — for unsaved/in-flight
 content use the preview endpoints instead.
+
+### Export to DOCX
+`GET /api/export/<brand>/<slug>?format=docx` → raw DOCX bytes,
+`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`.
+Renders committed content only (same constraint as PDF render). Response includes
+`Content-Disposition: attachment; filename="<slug>.docx"`.
+
+The DOCX is brand-formatted: correct fonts (embedded if `typography.embed_fonts: true` in
+`brand.yaml`), heading styles, running headers/footers, page breaks at H1 sections, and brand
+accent colours on KPI blocks, callouts, and section labels.
+
+**Handling the binary response:** the bytes are a ZIP-format binary, not text. To deliver it:
+- *Upload to Slack:* save bytes to a temp file (e.g. `/tmp/<slug>.docx`), then use the
+  `message` tool with `action=send_file` targeting the channel/thread.
+- *Upload to Google Drive / Dropbox / S3:* use the appropriate upload API with the raw bytes.
+- *Email attachment:* base64-encode the bytes and include as a MIME attachment part.
+
+Do **not** try to display or paste the raw bytes as text. Do **not** try to open or parse the
+DOCX file yourself — just route the bytes to wherever the user wants them delivered.
+
+**Worked example — export and upload to Slack:**
+```
+GET /api/export/northface/q3-strategy-memo?format=docx
+Authorization: Bearer <token>
+
+200 OK  (binary DOCX bytes)
+Content-Disposition: attachment; filename="q3-strategy-memo.docx"
+```
+Save response bytes → `/tmp/q3-strategy-memo.docx` → send file to Slack channel.
+
+**Error handling:** a 502 means the render pipeline failed (not a content problem — report as
+an infrastructure issue). A 504 means the render timed out (large document with many complex
+primitives — report and suggest retrying once).
 
 ### Preview unsaved content (PDF or HTML)
 `POST /api/preview/<brand>/<slug>` with `{ content }` → PDF bytes. `POST
